@@ -24,6 +24,30 @@ const userSchema = new mongoose.Schema(
       min: 1,
       max: 24,
     },
+    warningLimit: {
+      type: Number,
+      default: 3,
+      min: 0.01,
+      max: 24,
+    },
+    dangerLimit: {
+      type: Number,
+      default: 4,
+      min: 0.01,
+      max: 24,
+    },
+    currentStreak: {
+      type: Number,
+      default: 0,
+    },
+    bestStreak: {
+      type: Number,
+      default: 0,
+    },
+    lastStreakDate: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

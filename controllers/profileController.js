@@ -1,13 +1,40 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 
+const ensureUserLimitDefaults = async (user) => {
+  let changed = false;
+
+  if (user.dailyLimit === undefined || user.dailyLimit === null) {
+    user.dailyLimit = 4;
+    changed = true;
+  }
+
+  if (user.warningLimit === undefined || user.warningLimit === null) {
+    user.warningLimit = 3;
+    changed = true;
+  }
+
+  if (user.dangerLimit === undefined || user.dangerLimit === null) {
+    user.dangerLimit = 4;
+    changed = true;
+  }
+
+  if (changed) {
+    await user.save();
+  }
+
+  return user;
+};
+
 const getProfilePage = async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId).select("-password");
+    let user = await User.findById(req.session.userId);
 
     if (!user) {
       return res.redirect("/login");
     }
+
+    user = await ensureUserLimitDefaults(user);
 
     res.render("store/profileSettings", {
       user,
@@ -23,15 +50,34 @@ const getProfilePage = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, dailyLimit } = req.body;
+    const {
+      name,
+      dailyLimit,
+      warningHours,
+      warningMinutes,
+      dangerHours,
+      dangerMinutes,
+    } = req.body;
 
-    const user = await User.findById(req.session.userId);
+    let user = await User.findById(req.session.userId);
 
     if (!user) {
       return res.redirect("/login");
     }
 
+    user = await ensureUserLimitDefaults(user);
+
     const trimmedName = name ? name.trim() : "";
+    const parsedDailyLimit = Number(dailyLimit);
+
+    const parsedWarningHours = Number(warningHours);
+    const parsedWarningMinutes = Number(warningMinutes);
+
+    const parsedDangerHours = Number(dangerHours);
+    const parsedDangerMinutes = Number(dangerMinutes);
+
+    const warningLimit = parsedWarningHours + parsedWarningMinutes / 60;
+    const dangerLimit = parsedDangerHours + parsedDangerMinutes / 60;
 
     if (!trimmedName) {
       return res.render("store/profileSettings", {
@@ -42,7 +88,7 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    if (!dailyLimit || Number(dailyLimit) < 1 || Number(dailyLimit) > 24) {
+    if (!parsedDailyLimit || parsedDailyLimit < 1 || parsedDailyLimit > 24) {
       return res.render("store/profileSettings", {
         user,
         userName: req.session.userName || null,
@@ -51,8 +97,77 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    if (
+      Number.isNaN(parsedWarningHours) ||
+      Number.isNaN(parsedWarningMinutes) ||
+      parsedWarningHours < 0 ||
+      parsedWarningMinutes < 0 ||
+      parsedWarningMinutes > 59
+    ) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Warning threshold must have valid hours and minutes",
+        success: null,
+      });
+    }
+
+    if (
+      Number.isNaN(parsedDangerHours) ||
+      Number.isNaN(parsedDangerMinutes) ||
+      parsedDangerHours < 0 ||
+      parsedDangerMinutes < 0 ||
+      parsedDangerMinutes > 59
+    ) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Danger threshold must have valid hours and minutes",
+        success: null,
+      });
+    }
+
+    if (warningLimit <= 0 || warningLimit > 24) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Warning threshold must be between 1 minute and 24 hours",
+        success: null,
+      });
+    }
+
+    if (dangerLimit <= 0 || dangerLimit > 24) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Danger threshold must be between 1 minute and 24 hours",
+        success: null,
+      });
+    }
+
+    if (warningLimit >= dangerLimit) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Warning threshold must be less than danger threshold",
+        success: null,
+      });
+    }
+
+    if (dangerLimit > parsedDailyLimit) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Danger threshold cannot be greater than daily limit",
+        success: null,
+      });
+    }
+
     user.name = trimmedName;
-    user.dailyLimit = Number(dailyLimit);
+    user.dailyLimit = parsedDailyLimit;
+    user.warningLimit = Number(warningLimit.toFixed(2));
+    user.dangerLimit = Number(dangerLimit.toFixed(2));
+
     await user.save();
 
     req.session.userName = user.name;
@@ -61,7 +176,7 @@ const updateProfile = async (req, res) => {
       user,
       userName: req.session.userName || null,
       error: null,
-      success: "Profile updated successfully",
+      success: "Profile settings updated successfully",
     });
   } catch (error) {
     console.error(error);
@@ -73,11 +188,13 @@ const updatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
-    const user = await User.findById(req.session.userId);
+    let user = await User.findById(req.session.userId);
 
     if (!user) {
       return res.redirect("/login");
     }
+
+    user = await ensureUserLimitDefaults(user);
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
       return res.render("store/profileSettings", {

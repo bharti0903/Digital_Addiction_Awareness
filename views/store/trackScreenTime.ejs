@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Track Screen Time - Digital Addiction Awareness</title>
+  <title>Activity Tracking</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -11,10 +11,18 @@
 
   <%- include("../partials/navbar") %>
 
+  <%
+    function formatTime(value) {
+      const h = Math.floor(value || 0);
+      const m = Math.round(((value || 0) % 1) * 60);
+      return `${h}h ${m}m`;
+    }
+  %>
+
   <div class="max-w-6xl mx-auto px-4 py-8">
     <div class="mb-8">
-      <h1 class="text-3xl font-bold text-slate-900">Track Screen Time</h1>
-      <p class="text-slate-600">Hello, <%= userName %>. Add entries manually or use live session tracking.</p>
+      <h1 class="text-3xl font-bold text-slate-900">Activity Tracking</h1>
+      <p class="text-slate-600">Track live sessions, review today’s activity, and stay within your limits.</p>
     </div>
 
     <% if (error) { %>
@@ -29,28 +37,117 @@
       </div>
     <% } %>
 
-    <div class="grid md:grid-cols-3 gap-4 mb-6">
+    <div class="grid md:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
       <div class="bg-white p-5 rounded-2xl shadow border border-slate-200">
-        <p class="text-sm text-slate-500">Today's Total</p>
-        <p class="text-2xl font-bold text-indigo-700"><%= todayTotal || 0 %> hrs</p>
+        <p class="text-sm text-slate-500">Today’s Usage</p>
+        <p id="todayUsageValue" class="text-2xl font-bold text-indigo-700"><%= todayTotal %> hrs</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl shadow border border-slate-200">
+        <p class="text-sm text-slate-500">Time Left</p>
+        <p id="timeLeftValue" class="text-2xl font-bold text-green-700"><%= timeLeft %> hrs</p>
       </div>
 
       <div class="bg-white p-5 rounded-2xl shadow border border-slate-200">
         <p class="text-sm text-slate-500">Sessions Today</p>
-        <p class="text-2xl font-bold text-blue-700"><%= sessionCount || 0 %></p>
+        <p class="text-2xl font-bold text-blue-700"><%= sessionCount %></p>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl shadow border border-slate-200">
+        <p class="text-sm text-slate-500">Most Used</p>
+        <p class="text-2xl font-bold text-purple-700"><%= mostUsedCategory %></p>
       </div>
 
       <div class="bg-white p-5 rounded-2xl shadow border border-slate-200">
         <p class="text-sm text-slate-500">Status</p>
-        <p id="sessionStatus" class="text-2xl font-bold text-green-600">Idle</p>
+        <p id="usageStatusValue" class="text-2xl font-bold <%= usageStatus === 'Healthy' ? 'text-green-600' : usageStatus === 'Approaching Limit' ? 'text-yellow-600' : 'text-red-600' %>">
+          <%= usageStatus %>
+        </p>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow border border-slate-200 p-6 mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Daily Limit Progress</h2>
+        <span id="progressLabel" class="text-sm font-semibold text-slate-600"><%= todayTotal %> / <%= dailyLimit %> hrs</span>
+      </div>
+
+      <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+        <div
+          id="dailyProgressBar"
+          class="h-4 rounded-full <%= usageStatus === 'Healthy' ? 'bg-green-500' : usageStatus === 'Approaching Limit' ? 'bg-yellow-500' : 'bg-red-500' %>"
+          style="width:<%= progressPercent %>%"
+        ></div>
+      </div>
+
+      <div class="flex flex-wrap gap-3 mt-4 text-sm">
+        <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 font-semibold">
+          Warning: <%= formatTime(warningLimit) %>
+        </span>
+        <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+          Danger: <%= formatTime(dangerLimit) %>
+        </span>
       </div>
     </div>
 
     <div class="grid lg:grid-cols-2 gap-8 mb-8">
       <div class="bg-white rounded-2xl shadow border border-slate-200 p-6">
-        <h2 class="text-2xl font-bold mb-6">
-          <%= editEntry ? "Edit Entry" : "Add Screen Time Manually" %>
-        </h2>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold">Live Session</h2>
+          <span id="sessionStatus" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold">
+            Idle
+          </span>
+        </div>
+
+        <div class="grid gap-4">
+          <div>
+            <label class="block mb-2 font-medium">Category</label>
+            <select id="sessionCategory" class="w-full border rounded-lg px-4 py-3">
+              <option value="">Select category</option>
+              <option value="Social Media">Social Media</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Study">Study</option>
+              <option value="Gaming">Gaming</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block mb-2 font-medium">Notes</label>
+            <input
+              type="text"
+              id="sessionNotes"
+              placeholder="Optional notes for this session"
+              class="w-full border rounded-lg px-4 py-3"
+            >
+          </div>
+
+          <div class="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <p class="text-sm text-slate-500 mb-2">Session Timer</p>
+            <p id="liveTimer" class="text-5xl font-bold text-indigo-700">00:00:00</p>
+          </div>
+
+          <div class="mt-2 p-4 bg-indigo-50 rounded-lg text-center border border-indigo-100">
+            <p id="motivationText" class="text-indigo-700 font-semibold">
+              Start a live session to begin tracking.
+            </p>
+          </div>
+
+          <div class="flex gap-3">
+            <button id="startBtn" type="button" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+              Start Session
+            </button>
+            <button id="stopBtn" type="button" class="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition" disabled>
+              Stop Session
+            </button>
+          </div>
+
+          <div id="sessionMessage" class="hidden p-4 rounded-lg border"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow border border-slate-200 p-6">
+        <h2 class="text-2xl font-bold mb-6"><%= editEntry ? "Edit Activity Entry" : "Manual Entry" %></h2>
 
         <form action="<%= editEntry ? '/track-screen-time/update/' + editEntry._id : '/track-screen-time' %>" method="POST" class="grid gap-4">
           <div>
@@ -92,7 +189,7 @@
 
           <div class="flex gap-3">
             <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-              <%= editEntry ? "Update Entry" : "Add Screen Time" %>
+              <%= editEntry ? "Update Entry" : "Save Manual Entry" %>
             </button>
 
             <% if (editEntry) { %>
@@ -103,70 +200,20 @@
           </div>
         </form>
       </div>
-
-      <div class="bg-white rounded-2xl shadow border border-slate-200 p-6">
-        <h2 class="text-2xl font-bold mb-6">Live Session Tracking</h2>
-
-        <div class="grid gap-4">
-          <div>
-            <label class="block mb-2 font-medium">Category</label>
-            <select id="sessionCategory" class="w-full border rounded-lg px-4 py-3">
-              <option value="">Select category</option>
-              <option value="Social Media">Social Media</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Study">Study</option>
-              <option value="Gaming">Gaming</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block mb-2 font-medium">Notes</label>
-            <input
-              type="text"
-              id="sessionNotes"
-              placeholder="Optional notes for this session"
-              class="w-full border rounded-lg px-4 py-3"
-            >
-          </div>
-
-          <div class="p-6 rounded-xl bg-slate-50 border border-slate-200">
-            <p class="text-sm text-slate-500 mb-2">Session Timer</p>
-            <p id="liveTimer" class="text-4xl font-bold text-indigo-700">00:00:00</p>
-          </div>
-
-          <div class="mt-2 p-4 bg-indigo-50 rounded-lg text-center border border-indigo-100">
-            <p id="motivationText" class="text-indigo-700 font-semibold">
-              Ready to start your session 🚀
-            </p>
-          </div>
-
-          <div class="flex gap-3">
-            <button id="startBtn" type="button" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
-              Start Tracking
-            </button>
-            <button id="stopBtn" type="button" class="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition" disabled>
-              Stop Tracking
-            </button>
-          </div>
-
-          <div id="sessionMessage" class="hidden p-4 rounded-lg border"></div>
-        </div>
-      </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow border border-slate-200 p-6">
-      <h2 class="text-2xl font-bold mb-6">Your Entries</h2>
+    <div class="bg-white rounded-2xl shadow border border-slate-200 p-6 mb-8">
+      <h2 class="text-2xl font-bold mb-6">Today’s Session History</h2>
 
-      <% if (entries && entries.length > 0) { %>
+      <% if (todayEntries && todayEntries.length > 0) { %>
         <div class="space-y-4">
-          <% entries.forEach(entry => { %>
+          <% todayEntries.forEach(entry => { %>
             <div class="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <p><strong>Category:</strong> <%= entry.category %></p>
                 <p><strong>Hours:</strong> <%= entry.hours %></p>
                 <p><strong>Notes:</strong> <%= entry.notes || "No notes" %></p>
-                <p><strong>Date:</strong> <%= new Date(entry.date).toLocaleDateString() %></p>
+                <p><strong>Time:</strong> <%= new Date(entry.createdAt).toLocaleString() %></p>
               </div>
 
               <div class="flex gap-3">
@@ -184,17 +231,34 @@
           <% }) %>
         </div>
       <% } else { %>
-        <p class="text-slate-500">No entries added yet.</p>
+        <p class="text-slate-500">No activity sessions recorded today.</p>
+      <% } %>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow border border-slate-200 p-6">
+      <h2 class="text-2xl font-bold mb-6">All Activity Records</h2>
+
+      <% if (entries && entries.length > 0) { %>
+        <div class="space-y-4">
+          <% entries.forEach(entry => { %>
+            <div class="border rounded-xl p-4">
+              <p><strong>Category:</strong> <%= entry.category %></p>
+              <p><strong>Hours:</strong> <%= entry.hours %></p>
+              <p><strong>Notes:</strong> <%= entry.notes || "No notes" %></p>
+              <p><strong>Date:</strong> <%= new Date(entry.date).toLocaleDateString() %></p>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-slate-500">No activity records found.</p>
       <% } %>
     </div>
   </div>
 
   <%- include("../partials/footer") %>
+  <%- include("../partials/toast", { userId }) %>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
-
     socket.on("screenTimeUpdated", function () {
       window.location.reload();
     });
@@ -208,9 +272,20 @@
     const motivationText = document.getElementById("motivationText");
     const sessionStatus = document.getElementById("sessionStatus");
 
-    let trackingStartTime = null;
+    const todayUsageValue = document.getElementById("todayUsageValue");
+    const timeLeftValue = document.getElementById("timeLeftValue");
+    const usageStatusValue = document.getElementById("usageStatusValue");
+    const progressLabel = document.getElementById("progressLabel");
+    const dailyProgressBar = document.getElementById("dailyProgressBar");
+
+    const baseTodayTotal = <%- JSON.stringify(todayTotal || 0) %>;
+    const dailyLimit = <%- JSON.stringify(dailyLimit || 0) %>;
+    const warningLimit = <%- JSON.stringify(warningLimit || 0) %>;
+    const dangerLimit = <%- JSON.stringify(dangerLimit || 0) %>;
+
     let timerInterval = null;
-    let totalSeconds = 0;
+    let liveWarningShown = false;
+    let liveDangerShown = false;
 
     const messages = [
       "Stay focused 💪",
@@ -237,69 +312,182 @@
       sessionMessage.textContent = text;
     }
 
-    function formatTime(totalSeconds) {
+    function formatClock(totalSeconds) {
       const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
       const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
       const secs = String(totalSeconds % 60).padStart(2, "0");
       return `${hrs}:${mins}:${secs}`;
     }
 
+    function getSession() {
+      const raw = localStorage.getItem("activeSession");
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    function saveSession(data) {
+      localStorage.setItem("activeSession", JSON.stringify(data));
+    }
+
+    function clearSession() {
+      localStorage.removeItem("activeSession");
+    }
+
+    function getStatusByTotal(totalHours) {
+      if (totalHours < warningLimit) return "Healthy";
+      if (totalHours >= warningLimit && totalHours < dangerLimit) return "Approaching Limit";
+      return "Limit Reached";
+    }
+
+    function applyStatusStyle(status) {
+      usageStatusValue.textContent = status;
+      usageStatusValue.className = "text-2xl font-bold";
+
+      dailyProgressBar.classList.remove("bg-green-500", "bg-yellow-500", "bg-red-500");
+
+      if (status === "Healthy") {
+        usageStatusValue.classList.add("text-green-600");
+        dailyProgressBar.classList.add("bg-green-500");
+      } else if (status === "Approaching Limit") {
+        usageStatusValue.classList.add("text-yellow-600");
+        dailyProgressBar.classList.add("bg-yellow-500");
+      } else {
+        usageStatusValue.classList.add("text-red-600");
+        dailyProgressBar.classList.add("bg-red-500");
+      }
+    }
+
+    function updateLiveOverview(sessionSeconds) {
+      const sessionHours = sessionSeconds / 3600;
+      const combinedTodayTotal = baseTodayTotal + sessionHours;
+      const timeLeft = Math.max(dailyLimit - combinedTodayTotal, 0);
+      const progressPercent = Math.min((combinedTodayTotal / dailyLimit) * 100, 100);
+      const status = getStatusByTotal(combinedTodayTotal);
+
+      todayUsageValue.textContent = `${combinedTodayTotal.toFixed(2)} hrs`;
+      timeLeftValue.textContent = `${timeLeft.toFixed(2)} hrs`;
+      progressLabel.textContent = `${combinedTodayTotal.toFixed(2)} / ${dailyLimit} hrs`;
+      dailyProgressBar.style.width = `${progressPercent}%`;
+
+      applyStatusStyle(status);
+    }
+
+    function resetOverviewToServerValues() {
+      todayUsageValue.textContent = `${baseTodayTotal} hrs`;
+      timeLeftValue.textContent = `${Math.max(dailyLimit - baseTodayTotal, 0).toFixed(2)} hrs`;
+      progressLabel.textContent = `${baseTodayTotal} / ${dailyLimit} hrs`;
+      dailyProgressBar.style.width = `${Math.min((baseTodayTotal / dailyLimit) * 100, 100)}%`;
+
+      applyStatusStyle(getStatusByTotal(baseTodayTotal));
+    }
+
+    function showLiveToast(message, type) {
+      if (typeof createToast === "function") {
+        createToast(message, type);
+      }
+    }
+
+    function startTimer(startTime) {
+      clearInterval(timerInterval);
+
+      timerInterval = setInterval(() => {
+        const totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+        liveTimer.textContent = formatClock(totalSeconds);
+        updateLiveOverview(totalSeconds);
+
+        if (totalSeconds > 0 && totalSeconds % 10 === 0 && !liveDangerShown) {
+          motivationText.textContent = randomMessage();
+          motivationText.className = "text-indigo-700 font-semibold";
+        }
+
+        const sessionHours = totalSeconds / 3600;
+
+        if (!liveWarningShown && sessionHours >= warningLimit && sessionHours < dangerLimit) {
+          liveWarningShown = true;
+          motivationText.textContent = "⚠️ Warning threshold reached";
+          motivationText.className = "text-yellow-700 font-bold";
+          showLiveToast(`Live warning: you reached ${warningLimit.toFixed(2)} hrs in this session.`, "warning");
+        }
+
+        if (!liveDangerShown && sessionHours >= dangerLimit) {
+          liveDangerShown = true;
+          motivationText.textContent = "🚨 Danger threshold reached";
+          motivationText.className = "text-red-700 font-bold";
+          showLiveToast(`Live danger: you reached ${dangerLimit.toFixed(2)} hrs in this session.`, "danger");
+        }
+      }, 1000);
+    }
+
     function startTracking() {
       const category = sessionCategory.value;
 
       if (!category) {
-        showMessage("Please select a category before starting tracking.", false);
+        showMessage("Please select a category before starting the session.", false);
         return;
       }
 
-      trackingStartTime = Date.now();
-      totalSeconds = 0;
+      liveWarningShown = false;
+      liveDangerShown = false;
+
+      const sessionData = {
+        startTime: Date.now(),
+        category,
+        notes: sessionNotes.value || "",
+        liveWarningShown: false,
+        liveDangerShown: false
+      };
+
+      saveSession(sessionData);
+      startTimer(sessionData.startTime);
 
       sessionMessage.classList.add("hidden");
+      sessionStatus.textContent = "Live";
+      sessionStatus.className = "px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold";
 
-      sessionStatus.textContent = "Running";
-      sessionStatus.className = "text-2xl font-bold text-green-600";
-
-      motivationText.textContent = "Session started 🚀";
+      motivationText.textContent = "Live session started 🚀";
       motivationText.className = "text-indigo-700 font-semibold";
 
       startBtn.disabled = true;
       stopBtn.disabled = false;
       sessionCategory.disabled = true;
       sessionNotes.disabled = true;
+    }
 
-      timerInterval = setInterval(() => {
-        totalSeconds++;
-        liveTimer.textContent = formatTime(totalSeconds);
+    function restoreSession() {
+      const session = getSession();
+      if (!session) {
+        resetOverviewToServerValues();
+        return;
+      }
 
-        if (totalSeconds % 10 === 0) {
-          motivationText.textContent = randomMessage();
-          motivationText.className = "text-indigo-700 font-semibold";
-        }
+      sessionCategory.value = session.category || "";
+      sessionNotes.value = session.notes || "";
 
-        const hours = totalSeconds / 3600;
+      sessionCategory.disabled = true;
+      sessionNotes.disabled = true;
 
-        if (hours > 3.5) {
-          motivationText.textContent = "⚠️ You are close to your daily limit!";
-          motivationText.className = "text-yellow-600 font-bold";
-        }
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
 
-        if (hours > 4) {
-          motivationText.textContent = "🚨 Limit exceeded! Consider stopping.";
-          motivationText.className = "text-red-600 font-bold";
-        }
-      }, 1000);
+      sessionStatus.textContent = "Live";
+      sessionStatus.className = "px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold";
+
+      liveWarningShown = Boolean(session.liveWarningShown);
+      liveDangerShown = Boolean(session.liveDangerShown);
+
+      startTimer(session.startTime);
     }
 
     async function stopTracking() {
-      if (!trackingStartTime) return;
+      const session = getSession();
+      if (!session) return;
 
       clearInterval(timerInterval);
 
+      const totalSeconds = Math.floor((Date.now() - session.startTime) / 1000);
       const minutes = totalSeconds / 60;
 
-      sessionStatus.textContent = "Stopped";
-      sessionStatus.className = "text-2xl font-bold text-red-500";
+      sessionStatus.textContent = "Idle";
+      sessionStatus.className = "px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold";
 
       motivationText.textContent = "Session completed ✅";
       motivationText.className = "text-green-700 font-bold";
@@ -311,24 +499,21 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            category: sessionCategory.value,
+            category: session.category,
             minutes,
-            notes: sessionNotes.value
+            notes: session.notes
           })
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          showMessage(result.message || "Failed to save tracked session.", false);
+          showMessage(result.message || "Failed to save session.", false);
         } else {
           showMessage("Session saved successfully 🎉", true);
+          clearSession();
           liveTimer.textContent = "00:00:00";
-          trackingStartTime = null;
-          sessionCategory.disabled = false;
-          sessionNotes.disabled = false;
-          sessionCategory.value = "";
-          sessionNotes.value = "";
+          resetOverviewToServerValues();
         }
       } catch (error) {
         console.error(error);
@@ -336,8 +521,34 @@
       } finally {
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        sessionCategory.disabled = false;
+        sessionNotes.disabled = false;
+        sessionCategory.value = "";
+        sessionNotes.value = "";
+        liveWarningShown = false;
+        liveDangerShown = false;
       }
     }
+
+    document.addEventListener("visibilitychange", function () {
+      const session = getSession();
+      if (!session) return;
+
+      session.liveWarningShown = liveWarningShown;
+      session.liveDangerShown = liveDangerShown;
+      saveSession(session);
+    });
+
+    window.addEventListener("beforeunload", function () {
+      const session = getSession();
+      if (!session) return;
+
+      session.liveWarningShown = liveWarningShown;
+      session.liveDangerShown = liveDangerShown;
+      saveSession(session);
+    });
+
+    restoreSession();
 
     startBtn.addEventListener("click", startTracking);
     stopBtn.addEventListener("click", stopTracking);
