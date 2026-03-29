@@ -4,16 +4,29 @@ const Alert = require("../models/Alert");
 const { getIO } = require("../sockets");
 
 const formatThreshold = (value) => {
-  const hours = Math.floor(value);
-  const minutes = Math.round((value % 1) * 60);
+  const hours = Math.floor(value || 0);
+  const minutes = Math.round(((value || 0) % 1) * 60);
   return `${hours}h ${minutes}m`;
+};
+
+const safeEmit = (room, event, payload) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.to(room).emit(event, payload);
+    }
+  } catch (error) {
+    console.log("Socket emit skipped:", error.message);
+  }
 };
 
 const getTrackPage = async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
 
-    const entries = await ScreenTime.find({ user: req.session.userId }).sort({ createdAt: -1 });
+    const entries = await ScreenTime.find({ user: req.session.userId }).sort({
+      createdAt: -1
+    });
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -23,7 +36,7 @@ const getTrackPage = async (req, res) => {
 
     const todayEntries = await ScreenTime.find({
       user: req.session.userId,
-      date: { $gte: startOfToday, $lt: endOfToday },
+      date: { $gte: startOfToday, $lt: endOfToday }
     }).sort({ createdAt: -1 });
 
     const todayTotal = todayEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -35,7 +48,7 @@ const getTrackPage = async (req, res) => {
       Entertainment: 0,
       Study: 0,
       Gaming: 0,
-      Other: 0,
+      Other: 0
     };
 
     todayEntries.forEach((entry) => {
@@ -61,7 +74,9 @@ const getTrackPage = async (req, res) => {
       usageStatus = "Limit Reached";
     }
 
-    const progressPercent = Math.min((todayTotal / user.dailyLimit) * 100, 100);
+    const progressPercent = user.dailyLimit > 0
+      ? Math.min((todayTotal / user.dailyLimit) * 100, 100)
+      : 0;
 
     res.render("store/trackScreenTime", {
       entries,
@@ -71,15 +86,15 @@ const getTrackPage = async (req, res) => {
       success: null,
       userName: req.session.userName || null,
       userId: req.session.userId,
-      todayTotal: Number(todayTotal.toFixed(2)),
+      todayTotal: Number(todayTotal.toFixed(4)),
       sessionCount,
-      timeLeft: Number(timeLeft.toFixed(2)),
+      timeLeft: Number(timeLeft.toFixed(4)),
       mostUsedCategory,
       usageStatus,
       progressPercent: Number(progressPercent.toFixed(1)),
       warningLimit: user.warningLimit,
       dangerLimit: user.dangerLimit,
-      dailyLimit: user.dailyLimit,
+      dailyLimit: user.dailyLimit
     });
   } catch (error) {
     console.error(error);
@@ -99,7 +114,7 @@ const getTrackPage = async (req, res) => {
       progressPercent: 0,
       warningLimit: 0,
       dangerLimit: 0,
-      dailyLimit: 0,
+      dailyLimit: 0
     });
   }
 };
@@ -115,17 +130,17 @@ const addScreenTime = async (req, res) => {
     await ScreenTime.create({
       user: req.session.userId,
       category,
-      hours: Number(hours),
+      hours: Number(Number(hours).toFixed(4)),
       notes: notes ? notes.trim() : "",
+      source: "manual"
     });
 
     await handleDailyLimitAlert(req.session.userId);
     await updateUserStreak(req.session.userId);
 
-    const io = getIO();
-    io.to(`user_${req.session.userId}`).emit("screenTimeUpdated", {
+    safeEmit(`user_${req.session.userId}`, "screenTimeUpdated", {
       userId: req.session.userId,
-      message: "Screen time updated",
+      message: "Screen time updated"
     });
 
     res.redirect("/track-screen-time");
@@ -142,7 +157,7 @@ const saveTrackedSession = async (req, res) => {
     if (!category || minutes === undefined || Number(minutes) <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid tracking session data",
+        message: "Invalid tracking session data"
       });
     }
 
@@ -151,36 +166,36 @@ const saveTrackedSession = async (req, res) => {
     if (hours <= 0 || hours > 24) {
       return res.status(400).json({
         success: false,
-        message: "Tracked session duration must be between 0 and 24 hours",
+        message: "Tracked session duration must be between 0 and 24 hours"
       });
     }
 
     const entry = await ScreenTime.create({
       user: req.session.userId,
       category,
-      hours: Number(hours.toFixed(2)),
+      hours: Number(hours.toFixed(4)),
       notes: notes ? notes.trim() : "Live tracked session",
+      source: "live-session"
     });
 
     await handleDailyLimitAlert(req.session.userId);
     await updateUserStreak(req.session.userId);
 
-    const io = getIO();
-    io.to(`user_${req.session.userId}`).emit("screenTimeUpdated", {
+    safeEmit(`user_${req.session.userId}`, "screenTimeUpdated", {
       userId: req.session.userId,
-      message: "Screen time updated",
+      message: "Screen time updated"
     });
 
     return res.status(201).json({
       success: true,
       message: "Session saved successfully",
-      entry,
+      entry
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({
       success: false,
-      message: "Failed to save tracked session",
+      message: "Failed to save tracked session"
     });
   }
 };
@@ -189,10 +204,13 @@ const getEditScreenTimePage = async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
 
-    const entries = await ScreenTime.find({ user: req.session.userId }).sort({ createdAt: -1 });
+    const entries = await ScreenTime.find({ user: req.session.userId }).sort({
+      createdAt: -1
+    });
+
     const editEntry = await ScreenTime.findOne({
       _id: req.params.id,
-      user: req.session.userId,
+      user: req.session.userId
     });
 
     if (!editEntry) {
@@ -207,7 +225,7 @@ const getEditScreenTimePage = async (req, res) => {
 
     const todayEntries = await ScreenTime.find({
       user: req.session.userId,
-      date: { $gte: startOfToday, $lt: endOfToday },
+      date: { $gte: startOfToday, $lt: endOfToday }
     }).sort({ createdAt: -1 });
 
     const todayTotal = todayEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -219,7 +237,7 @@ const getEditScreenTimePage = async (req, res) => {
       Entertainment: 0,
       Study: 0,
       Gaming: 0,
-      Other: 0,
+      Other: 0
     };
 
     todayEntries.forEach((entry) => {
@@ -245,7 +263,9 @@ const getEditScreenTimePage = async (req, res) => {
       usageStatus = "Limit Reached";
     }
 
-    const progressPercent = Math.min((todayTotal / user.dailyLimit) * 100, 100);
+    const progressPercent = user.dailyLimit > 0
+      ? Math.min((todayTotal / user.dailyLimit) * 100, 100)
+      : 0;
 
     res.render("store/trackScreenTime", {
       entries,
@@ -255,15 +275,15 @@ const getEditScreenTimePage = async (req, res) => {
       success: null,
       userName: req.session.userName || null,
       userId: req.session.userId,
-      todayTotal: Number(todayTotal.toFixed(2)),
+      todayTotal: Number(todayTotal.toFixed(4)),
       sessionCount,
-      timeLeft: Number(timeLeft.toFixed(2)),
+      timeLeft: Number(timeLeft.toFixed(4)),
       mostUsedCategory,
       usageStatus,
       progressPercent: Number(progressPercent.toFixed(1)),
       warningLimit: user.warningLimit,
       dangerLimit: user.dangerLimit,
-      dailyLimit: user.dailyLimit,
+      dailyLimit: user.dailyLimit
     });
   } catch (error) {
     console.error(error);
@@ -283,8 +303,8 @@ const updateScreenTime = async (req, res) => {
       { _id: req.params.id, user: req.session.userId },
       {
         category,
-        hours: Number(hours),
-        notes: notes ? notes.trim() : "",
+        hours: Number(Number(hours).toFixed(4)),
+        notes: notes ? notes.trim() : ""
       },
       { new: true }
     );
@@ -296,10 +316,9 @@ const updateScreenTime = async (req, res) => {
     await handleDailyLimitAlert(req.session.userId);
     await updateUserStreak(req.session.userId);
 
-    const io = getIO();
-    io.to(`user_${req.session.userId}`).emit("screenTimeUpdated", {
+    safeEmit(`user_${req.session.userId}`, "screenTimeUpdated", {
       userId: req.session.userId,
-      message: "Screen time updated",
+      message: "Screen time updated"
     });
 
     res.redirect("/track-screen-time");
@@ -313,15 +332,14 @@ const deleteScreenTime = async (req, res) => {
   try {
     await ScreenTime.findOneAndDelete({
       _id: req.params.id,
-      user: req.session.userId,
+      user: req.session.userId
     });
 
     await updateUserStreak(req.session.userId);
 
-    const io = getIO();
-    io.to(`user_${req.session.userId}`).emit("screenTimeUpdated", {
+    safeEmit(`user_${req.session.userId}`, "screenTimeUpdated", {
       userId: req.session.userId,
-      message: "Screen time updated",
+      message: "Screen time updated"
     });
 
     res.redirect("/track-screen-time");
@@ -340,11 +358,10 @@ const handleDailyLimitAlert = async (userId) => {
 
   const todayEntries = await ScreenTime.find({
     user: userId,
-    date: { $gte: startOfToday },
+    date: { $gte: startOfToday }
   });
 
   const todayTotal = todayEntries.reduce((sum, entry) => sum + entry.hours, 0);
-  const io = getIO();
 
   if (todayTotal >= user.warningLimit && todayTotal < user.dangerLimit) {
     const message = `You reached your warning threshold of ${formatThreshold(user.warningLimit)}.`;
@@ -352,20 +369,21 @@ const handleDailyLimitAlert = async (userId) => {
     const existingWarning = await Alert.findOne({
       user: userId,
       message,
-      createdAt: { $gte: startOfToday },
+      type: "warning",
+      createdAt: { $gte: startOfToday }
     });
 
     if (!existingWarning) {
       const newAlert = await Alert.create({
         user: userId,
         message,
-        type: "warning",
+        type: "warning"
       });
 
-      io.to(`user_${userId}`).emit("newAlert", {
+      safeEmit(`user_${userId}`, "newAlert", {
         id: newAlert._id,
         type: newAlert.type,
-        message: newAlert.message,
+        message: newAlert.message
       });
     }
   }
@@ -376,20 +394,21 @@ const handleDailyLimitAlert = async (userId) => {
     const existingDanger = await Alert.findOne({
       user: userId,
       message,
-      createdAt: { $gte: startOfToday },
+      type: "danger",
+      createdAt: { $gte: startOfToday }
     });
 
     if (!existingDanger) {
       const newAlert = await Alert.create({
         user: userId,
         message,
-        type: "danger",
+        type: "danger"
       });
 
-      io.to(`user_${userId}`).emit("newAlert", {
+      safeEmit(`user_${userId}`, "newAlert", {
         id: newAlert._id,
         type: newAlert.type,
-        message: newAlert.message,
+        message: newAlert.message
       });
     }
   }
@@ -407,7 +426,7 @@ const updateUserStreak = async (userId) => {
 
   const todayEntries = await ScreenTime.find({
     user: userId,
-    date: { $gte: startOfToday, $lt: endOfToday },
+    date: { $gte: startOfToday, $lt: endOfToday }
   });
 
   const todayTotal = todayEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -455,5 +474,5 @@ module.exports = {
   saveTrackedSession,
   getEditScreenTimePage,
   updateScreenTime,
-  deleteScreenTime,
+  deleteScreenTime
 };

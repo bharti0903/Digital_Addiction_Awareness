@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
   {
@@ -47,6 +48,12 @@ const userSchema = new mongoose.Schema(
     lastStreakDate: {
       type: Date,
       default: null,
+    },
+    extensionToken: {
+      type: String,
+      unique: true,
+      index: true,
+      default: () => crypto.randomBytes(24).toString("hex"),
     },
   },
   { timestamps: true }

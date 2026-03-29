@@ -30,7 +30,7 @@
   <div class="max-w-5xl mx-auto px-4 py-8">
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-slate-900">Limits & Preferences</h1>
-      <p class="text-slate-600">Manage your account details, screen-time thresholds, and password.</p>
+      <p class="text-slate-600">Manage your account details, screen-time thresholds, password, and browser extension token.</p>
     </div>
 
     <% if (error) { %>
@@ -203,6 +203,45 @@
     </div>
 
     <div class="mt-8 bg-white rounded-2xl shadow border border-slate-200 p-6">
+      <h2 class="text-2xl font-bold mb-4">Browser Extension Token</h2>
+      <p class="text-slate-600 mb-4">
+        Copy this token and paste it into the Chrome extension settings page. This connects your browser activity to your account.
+      </p>
+
+      <div class="grid gap-4">
+        <div>
+          <label class="block mb-2 font-medium">Extension Token</label>
+          <div class="flex flex-col md:flex-row gap-3">
+            <input
+              id="extensionTokenInput"
+              type="text"
+              value="<%= user.extensionToken %>"
+              readonly
+              class="w-full border rounded-lg px-4 py-3 bg-slate-50"
+            >
+            <button
+              type="button"
+              onclick="copyToken()"
+              class="px-5 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <form action="/profile-settings/regenerate-extension-token" method="POST">
+          <button
+            type="submit"
+            class="px-5 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition"
+            onclick="return confirm('Regenerate token? Old extension token will stop working.')"
+          >
+            Regenerate Token
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="mt-8 bg-white rounded-2xl shadow border border-slate-200 p-6">
       <h2 class="text-2xl font-bold mb-4">How Your Limits Work</h2>
       <div class="grid md:grid-cols-3 gap-4">
         <div class="p-4 rounded-xl bg-yellow-50 border border-yellow-200">
@@ -230,6 +269,17 @@
   </div>
 
   <%- include("../partials/footer") %>
+
+  <script>
+    function copyToken() {
+      const input = document.getElementById("extensionTokenInput");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value)
+        .then(() => alert("Extension token copied"))
+        .catch(() => alert("Could not copy token"));
+    }
+  </script>
 
 </body>
 </html>

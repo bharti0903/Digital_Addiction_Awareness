@@ -1,13 +1,9 @@
 let ioInstance = null;
 
-const initSocket = (server) => {
-  const { Server } = require("socket.io");
+const initSocket = (io) => {
+  ioInstance = io;
 
-  ioInstance = new Server(server);
-
-  ioInstance.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
-
+  io.on("connection", (socket) => {
     socket.on("joinUserRoom", (userId) => {
       if (userId) {
         socket.join(`user_${userId}`);
@@ -15,18 +11,16 @@ const initSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
+      // no-op
     });
   });
-
-  return ioInstance;
 };
 
 const getIO = () => {
-  if (!ioInstance) {
-    throw new Error("Socket.io not initialized");
-  }
   return ioInstance;
 };
 
-module.exports = { initSocket, getIO };
+module.exports = {
+  initSocket,
+  getIO
+};

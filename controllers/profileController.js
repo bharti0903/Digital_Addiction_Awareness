@@ -1,7 +1,8 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../models/User");
 
-const ensureUserLimitDefaults = async (user) => {
+const ensureUserDefaults = async (user) => {
   let changed = false;
 
   if (user.dailyLimit === undefined || user.dailyLimit === null) {
@@ -16,6 +17,11 @@ const ensureUserLimitDefaults = async (user) => {
 
   if (user.dangerLimit === undefined || user.dangerLimit === null) {
     user.dangerLimit = 4;
+    changed = true;
+  }
+
+  if (!user.extensionToken) {
+    user.extensionToken = crypto.randomBytes(24).toString("hex");
     changed = true;
   }
 
@@ -34,7 +40,7 @@ const getProfilePage = async (req, res) => {
       return res.redirect("/login");
     }
 
-    user = await ensureUserLimitDefaults(user);
+    user = await ensureUserDefaults(user);
 
     res.render("store/profileSettings", {
       user,
@@ -65,7 +71,7 @@ const updateProfile = async (req, res) => {
       return res.redirect("/login");
     }
 
-    user = await ensureUserLimitDefaults(user);
+    user = await ensureUserDefaults(user);
 
     const trimmedName = name ? name.trim() : "";
     const parsedDailyLimit = Number(dailyLimit);
@@ -194,13 +200,24 @@ const updatePassword = async (req, res) => {
       return res.redirect("/login");
     }
 
-    user = await ensureUserLimitDefaults(user);
+    user = await ensureUserDefaults(user);
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
       return res.render("store/profileSettings", {
         user,
         userName: req.session.userName || null,
         error: "All password fields are required",
+        success: null,
+      });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.render("store/profileSettings", {
+        user,
+        userName: req.session.userName || null,
+        error: "Current password is incorrect",
         success: null,
       });
     }
@@ -218,18 +235,7 @@ const updatePassword = async (req, res) => {
       return res.render("store/profileSettings", {
         user,
         userName: req.session.userName || null,
-        error: "New passwords do not match",
-        success: null,
-      });
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-    if (!isMatch) {
-      return res.render("store/profileSettings", {
-        user,
-        userName: req.session.userName || null,
-        error: "Current password is incorrect",
+        error: "New password and confirm password do not match",
         success: null,
       });
     }
@@ -237,7 +243,7 @@ const updatePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    res.render("store/profileSettings", {
+    return res.render("store/profileSettings", {
       user,
       userName: req.session.userName || null,
       error: null,
@@ -249,8 +255,34 @@ const updatePassword = async (req, res) => {
   }
 };
 
+const regenerateExtensionToken = async (req, res) => {
+  try {
+    let user = await User.findById(req.session.userId);
+
+    if (!user) {
+      return res.redirect("/login");
+    }
+
+    user = await ensureUserDefaults(user);
+
+    user.extensionToken = crypto.randomBytes(24).toString("hex");
+    await user.save();
+
+    return res.render("store/profileSettings", {
+      user,
+      userName: req.session.userName || null,
+      error: null,
+      success: "Extension token regenerated successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    res.redirect("/profile-settings");
+  }
+};
+
 module.exports = {
   getProfilePage,
   updateProfile,
   updatePassword,
+  regenerateExtensionToken,
 };

@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { saveExtensionData } = require("../controllers/extensionController");
+const {
+  saveExtensionData,
+  getExtensionTodaySummary,
+} = require("../controllers/extensionController");
 
 router.post("/extension/track", saveExtensionData);
+router.get("/extension/today-summary", getExtensionTodaySummary);
 
 module.exports = router;

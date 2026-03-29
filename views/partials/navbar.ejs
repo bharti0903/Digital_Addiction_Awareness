@@ -13,11 +13,21 @@
     <div class="flex items-center gap-3 sm:gap-4 flex-wrap justify-end">
       <% if (currentUser) { %>
         
-        <a href="/" class="text-blue-600 hover:text-blue-700 font-semibold transition">Dashboard</a>
+        <a href="/dashboard" class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-600">
+          Dashboard
+        </a>
+        <a href="/reports" class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-600">
+          Reports
+        </a>
+        <a href="/focus-mode" class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-600">
+         Focus Mode
+        </a>
         <a href="/track-screen-time" class="text-blue-600 hover:text-blue-700 font-semibold transition">Activity</a>
         <a href="/weekly-report" class="text-blue-600 hover:text-blue-700 font-semibold transition">Analytics</a>
         <a href="/smart-alerts" class="text-blue-600 hover:text-blue-700 font-semibold transition">Limits</a>
         <a href="/detox-challenges" class="text-blue-600 hover:text-blue-700 font-semibold transition">Goals</a>
+        
+        
         <a href="/profile-settings" class="text-blue-600 hover:text-blue-700 font-semibold transition">Settings</a>
         <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition">
           Logout

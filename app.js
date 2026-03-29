@@ -4,8 +4,9 @@ const http = require("http");
 const session = require("express-session");
 const MongoStore = require("connect-mongo").default;
 const dotenv = require("dotenv");
+const { Server } = require("socket.io");
+
 const connectDB = require("./config/db");
-const { protect } = require("./middleware/authMiddleware");
 const { initSocket } = require("./sockets");
 
 dotenv.config();
@@ -18,13 +19,19 @@ const reportRoutes = require("./routes/reportRoutes");
 const alertRoutes = require("./routes/alertRoutes");
 const challengeRoutes = require("./routes/challengeRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const focusRoutes = require("./routes/focusRoutes");
 const extensionRoutes = require("./routes/extensionRoutes");
-
 
 const app = express();
 const server = http.createServer(app);
 
-initSocket(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+initSocket(io);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -59,6 +66,7 @@ app.use("/", reportRoutes);
 app.use("/", alertRoutes);
 app.use("/", challengeRoutes);
 app.use("/", profileRoutes);
+app.use("/", focusRoutes);
 app.use("/", extensionRoutes);
 
 app.use((req, res) => {
